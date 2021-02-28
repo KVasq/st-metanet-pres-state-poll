@@ -1,0 +1,2 @@
+model_checkpoint_path: "st-metanet-0092.params"
+all_model_checkpoint_paths: "st-metanet-0092.params"
