@@ -33,15 +33,24 @@ def state_index(): #retrieves the states list (ordered for correlation mat) and 
 	with open(os.path.join(DATA_PATH, 'states.txt')) as f:
 		states = f.read().strip().split(',')
 	state_ids = {}
+
+	#states.remove('DC')
+
 	for i, state in enumerate(states):
 		state_ids[state] = i
+
+	#state_ids.pop('DC')
+	#print(state_ids)
 	return state_ids
 
 def correlation_matrix(n_neighbors): #creates a correlation matrix restricted to n nearest neighbors
 	filename = os.path.join(DATA_PATH, 'correlation_matrix_%d.h5' % n_neighbors) #assigns a file to read/write matrix per n neighbors
 	# if not os.path.exists(filename):
 	state_idx = state_index()
-	graph = pd.read_csv(os.path.join(DATA_PATH, 'state_correlation_matrix.csv'))
+	graph = pd.read_csv(os.path.join(DATA_PATH, 'state_corr.csv'))
+
+	#graph = graph.drop([8])
+	#graph = graph.drop(['DC'], axis=1)
 
     # initialize correlation matrix
 	n = len(state_idx)
@@ -77,6 +86,10 @@ def state_urbanicity():
 	state_idx = state_index()
 	state_urb = pd.read_csv(os.path.join(DATA_PATH, 'urbanicity_index.csv'))
 
+
+	#state_urb = state_urb.drop([0])
+	#state_urb = state_urb.reset_index(drop=True)
+
 	n = len(state_idx)
 	urb = np.zeros((n, 2))
 	for i in range(n):
@@ -88,6 +101,9 @@ def state_white_evang_pct():
 	state_idx = state_index()
 	state_evangel = pd.read_csv(os.path.join(DATA_PATH, 'white_evangel_pct.csv'))
 
+	#state_evangel = state_evangel.drop([50])
+	#state_evangel = state_evangel.reset_index(drop=True)
+
 	n = len(state_idx)
 	evangel_pct = np.zeros((n, 1))
 	for i in range(n):
@@ -95,9 +111,80 @@ def state_white_evang_pct():
 		evangel_pct[state_idx[state]] = state_evangel.values[i, 1]
 	return evangel_pct
 
+def state_education():
+    state_edu = pd.read_csv(os.path.join(DATA_PATH, 'state_education.csv'))
+    state_idx = state_index()
+
+    #state_edu = state_edu.drop([17])
+    #state_edu = state_edu.reset_index(drop=True)
+
+    n = len(state_idx)
+    edu = np.zeros((n, 1))
+    for i in range(n):
+        state = state_edu.values[i, 0]
+        edu[state_idx[state], :] = state_edu.values[i, 1]
+    return edu
+
+def state_prev_results():
+	state_idx = state_index()
+	state_prev = pd.read_csv(os.path.join(DATA_PATH, 'state_2016_results.csv'))
+
+	#state_prev = state_prev.drop([17])
+	#state_prev = state_prev.reset_index(drop=True)
+
+	n = len(state_idx)
+	prev = np.zeros((n, 2))
+	for i in range(n):
+		state = state_prev.values[i,0]
+		prev[state_idx[state], :] = state_prev.values[i, 1:3]
+	return prev
+
+def state_median_age():
+	state_idx = state_index()
+	state_age = pd.read_csv(os.path.join(DATA_PATH,'state_median_age.csv'))
+
+	#state_age = state_age.drop([17])
+	#state_age = state_age.reset_index(drop=True)
+
+	n = len(state_idx)
+	age = np.zeros((n, 1))
+	for i in range(n):
+		state = state_age.values[i,0]
+		age[state_idx[state], :] = state_age.values[i, 1]
+	return age
+
+def state_median_income():
+	state_idx = state_index()
+	state_income = pd.read_csv(os.path.join(DATA_PATH,'state_median_income.csv'))
+
+	#state_income = state_income.drop([17])
+	#state_income = state_income.reset_index(drop=True)
+
+	n = len(state_idx)
+	income = np.zeros((n, 1))
+	for i in range(n):
+		state = state_income.values[i,0]
+		income[state_idx[state], :] = state_income.values[i, 1]
+	return income
+
+def state_races():
+	state_idx = state_index()
+	state_race = pd.read_csv(os.path.join(DATA_PATH,'state_races.csv'))
+
+	#state_race = state_race.drop([8])
+	#state_race = state_race.reset_index(drop=True)
+
+	n = len(state_idx)
+	race = np.zeros((n, 4))
+	for i in range(n):
+		state = state_race.values[i,0]
+		race[state_idx[state], :] = state_race.values[i, 1:5]
+	return race
+
 def fill_missing(data):
 	data = data.copy()
 	data[np.absolute(data) < 1e-8] = float('nan')
-	data = data.fillna(method='pad')
 	data = data.fillna(method='bfill')
+	data = data.fillna(method='pad')
+	#data = data.fillna(method='bfill')
 	return data

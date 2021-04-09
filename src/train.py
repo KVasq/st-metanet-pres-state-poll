@@ -62,14 +62,14 @@ class ModelTrainer:
 				#print('calculating loss')
 
 				with tf.GradientTape(persistent=True) as tape:
-					outputs = [self.net(feat_, data_, label_, mask_, is_training=is_training)] # loss, prediction, label, mask
+					outputs = [self.net(feat_, data_, label_, mask_, is_training=is_training)] # loss, (prediction, label, mask)
 
 				#print('loss calculated')
 				gradients = []
 				#print('weights', self.net.trainable_weights)
 				#print('outputs', outputs)
 				for out, w in zip(outputs, self.net.trainable_weights):
-					print('nbatch', nbatch)
+					#print('nbatch', nbatch)
 					#if len(tf.shape(gradients)) < 2:
 					#	gradients = tf.reshape(gradients, (0, 2, 96))
 					#print('w', w)
@@ -100,6 +100,8 @@ class ModelTrainer:
 				for metric in metrics:
 					for out in outputs:
 						_d, _l, _m = out[1]
+						#print('prediction', _d)
+						#print('label', _l)
 						metric.update(_d, _l, _m) #[output, label, mask]
 			speedometer.log_metrics(nbatch + 1, metrics)
 
@@ -114,12 +116,12 @@ class ModelTrainer:
 			if eval is not None:
 				#print('processing eval data')
 				self.process_data(epoch, eval, metrics, is_training=False, title='[EVAL]')
-				if (train is not None) and (metrics is not None):
-					self.logger.log(epoch, metrics)
+
 
 			if test is not None:
 				self.process_data(epoch, test, metrics, is_training=False, title='[TEST]')
-
+				if (train is not None) and (metrics is not None):
+					self.logger.log(epoch, metrics)
 			print('')
 
 def main(args):
@@ -188,7 +190,7 @@ def main(args):
 		metrics		= [MAE(scaler), RMSE(scaler), IndexMAE(scaler, [0,1,2]), IndexRMSE(scaler, [0,1,2])],
 	)
 	#print('ModelTrainer fit finished 1')
-	net.load_weights('%s-%04d.params' % (name, logger.best_epoch()))
+	net.load_weights('%s-0107.ckpt.data-00000-of-00001' % (name)) #logger.best_epoch()))
 	model_trainer.fit(
 		begin_epoch	= 0,
 		num_epochs	= 1,

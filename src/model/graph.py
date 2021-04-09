@@ -4,6 +4,7 @@ import tensorflow.experimental.numpy as tnp
 import dgl
 from dgl import DGLGraph
 from functools import partial
+from helper.metric import tf_batchdot
 
 from config import MODEL
 
@@ -24,21 +25,21 @@ class Graph(tf.keras.layers.Layer):
         if graph_type == 'None': return None
         dist, e_bi = graph
         return [
-            Graph.create(graph_type, dist.T, e_bi, hidden_size, name + 'in_'),
+            #Graph.create(graph_type, dist.T, e_bi, hidden_size, name + 'in_'),
             Graph.create(graph_type, dist, e_bi, hidden_size, name + 'out_')
         ]
 
     def __init__(self, dist, edge, hidden_size, name=None):
         super(Graph, self).__init__(name=name)
         self.dist = dist #correlation_matrix
-        self.edge = edge #e_bi
+        self.edge = edge #e_bi - connected node ids for each node
         self.hidden_size = hidden_size
 
         # create graph
-        self.num_nodes = n = self.dist.shape[1]
+        self.num_nodes = n = 50 #self.dist.shape[0]
         src, dst, dist = [], [], []
-        for i in range(n):
-            for j in edge[i]:
+        for i in range(n): # for each node
+            for j in edge[i]: # for each edge for node i (j = dst node id)
                 src.append(j) # from row #
                 dst.append(i) # to coloumn #
                 dist.append(self.dist[j, i]) # value of [row, column] in correlation matrix
@@ -56,10 +57,12 @@ class Graph(tf.keras.layers.Layer):
         g.set_n_initializer(dgl.init.zero_initializer)
         g.add_nodes(self.num_nodes)
         g.add_edges(self.src, self.dst)
-        with tf.device('GPU:0'):
-            g.edata['dist'] = self.dist
+        with tf.device(ctx):
+            g.edata['dist'] = self.dist # assigns attribute dist[i] to edges [src[i],dst[i]]
         self.graph_on_ctx.append(g)
         self.ctx.append(ctx)
+
+
 
     def get_graph_on_ctx(self, ctx):
         if ctx not in self.ctx:
@@ -68,11 +71,11 @@ class Graph(tf.keras.layers.Layer):
 
     def call(self, state, feature): # first dimension of state & feature should be num_nodes
         g = self.get_graph_on_ctx('GPU:0')
-        #print('graph state',state.shape)
-        #print('feature', feature.shape)
-        g.ndata['state'] = state
+        #print('graph state shape',state.shape)
+        #print('graph feature shape', feature.shape)
+        g.ndata['state'] = state    # assigns node features for all nodes
         g.ndata['feature'] = feature
-        g.update_all(self.msg_edge, self.msg_reduce)
+        g.update_all(self.msg_edge, self.msg_reduce) # send messages along all the edges and update all the nodes
         state = g.ndata.pop('new_state')
         return state
 
@@ -104,10 +107,10 @@ class GAT(Graph):
         super(GAT, self).__init__(dist, edge, hidden_size, name)
 
     def init_model(self):
-        self.weight = tf.Variable(name='weight', shape=(self.hidden_size * 2, self.hidden_size))
+        self.weight = tf.Variable(tf.zeros([self.hidden_size * 2, self.hidden_size]), name='weight', shape=(self.hidden_size * 2, self.hidden_size))
 
     def msg_edge(self, edge):
-        state = tnp.concat(edge.src['state'], edge.dst['state'], dim=-1)
+        state = tnp.concatenate((edge.src['state'], edge.dst['state']), -1)
         ctx = 'GPU:0'
 
         alpha = tf.nn.leaky_relu(tf.tensordot(state, self.weight, axes=1))
@@ -135,26 +138,28 @@ class MetaGAT(Graph):
     def init_model(self):
         from model.basic_structure import MLP
         self.w_mlp = MLP(MODEL['meta_hiddens'] + [self.hidden_size * self.hidden_size * 2,], 'sigmoid', False)
-        self.weight = tf.Variable([[0.]], name='weight', shape=(1,1))
+        self.weight = tf.Variable(tf.zeros([1,1]), name='weight', shape=(1,1))
 
     def msg_edge(self, edge):
         state = tf.concat([edge.src['state'], edge.dst['state']], -1)
-        #print('edge.src state', edge.src['state'])
-        #print('edge.dst state', edge.dst['state'])
-        #print('edge.src feature', edge.src['feature'])
-        #print('edge dst feature', edge.dst['feature'])
+        #print('edge.src state shape', edge.src['state'].shape)
+        #print('edge.dst state shape', edge.dst['state'].shape)
+        #print('edge.src feature shape', edge.src['feature'].shape)
+        #print('edge dst feature shape', edge.dst['feature'].shape)
         feature = tf.concat([edge.src['feature'], edge.dst['feature'], tf.cast(edge.data['dist'], tf.float32)], -1)
 
         # generate weight by meta-learner
         weight = self.w_mlp(feature)
-        #print('weight', weight.shape)
+        #print('weight shape', weight.shape)
         weight = tf.reshape(weight, shape=(-1, self.hidden_size * 2, self.hidden_size))
         #print('weight reshape', weight.shape)
+
         # reshape state to [n, b * t, d] for batch_dot (currently mxnet only support batch_dot for 3D tensor)
         shape = state.shape
+        #print('state shape', shape)
         state = tf.reshape(state, shape=(shape[0], -1, shape[-1])) # []
         #print('state reshape', state.shape)
-        alpha = tf.nn.leaky_relu(tnp.matmul(state, weight))
+        alpha = tf.nn.leaky_relu(tf_batchdot(state, weight))
         #print('alpha', alpha.shape)
         # reshape alpha to [n, b, t, d]
         alpha = tf.reshape(alpha, shape=shape[:-1] + (self.hidden_size,))
@@ -164,6 +169,6 @@ class MetaGAT(Graph):
         state = node.mailbox['state']
         alpha = node.mailbox['alpha']
         alpha = tf.nn.softmax(alpha, axis=1)
-
+        #print('MetaGAT weight', self.weight)
         new_state = tf.nn.relu(tf.reduce_sum(alpha * state, axis=1)) * tf.math.sigmoid(self.weight)
         return { 'new_state': new_state }

@@ -56,6 +56,7 @@ class Encoder(tf.keras.layers.Layer):
             # graph attention
             if self.graphs[depth] != None:
                 _data = 0
+                #print('encoder graph call')
                 for g in self.graphs[depth]:
                     _data = _data + g(data, feature)
                 data = _data
@@ -142,6 +143,7 @@ class Decoder(tf.keras.layers.Layer):
                 data, states[depth] = cell.forward_single(feature, data, states[depth])
                 if self.graphs[depth] is not None:
                     _data = 0
+                    #print('decoder graph call')
                     for g in self.graphs[depth]:
                         _data = _data + g(data, feature)
                     data = _data / len(self.graphs[depth])
@@ -258,7 +260,10 @@ class Seq2Seq(tf.keras.Model):
         mask = tf.transpose(mask, (2, 0, 1, 3)) # [n, b, t, d]
         #print('data transposed', tf.shape(data))
         # geo-feature embedding (NMK Learner)
-        feature = self.geo_encoder(tf.reduce_mean(feature, axis=0)) # shape=[n, d]
+        #print('feature pre encoded',feature)
+
+        feature = self.geo_encoder(np.mean(feature, axis=0)) # shape=[n, d]
+        #print('feature encoded', feature)
 
         # seq2seq encoding process
         states = self.encoder(feature, data)
@@ -274,12 +279,13 @@ class Seq2Seq(tf.keras.Model):
         label = label[:,:,:,:self.decoder.output_dim]
         mask = tf.cast(mask, tf.float64)
         #print('seq2seq output', output)
+        #print('label', label)
         #print('seq2seq mask', mask)
         output = output * mask
         label = label * mask
 
         loss = tf_mean_exclude(tf.abs(output - label), axis=1) # exclude batch axis
-        print('loss', loss)
+        #print('loss', loss)
         return loss, [output, label, mask] #output is prediction
 
 def net(settings):

@@ -88,7 +88,6 @@ class MyGRUCell(RNNCell):
         #print('begin state', begin_state)
         #print('GRU: begin state shape', np.array(begin_state).shape)
         #print('GRU: get initial state', self.cell.get_initial_state(data))
-
         data, state = self.cell(data, initial_state=begin_state)
         #print('GRUCell pass %d:' % _, 'data', data.shape, 'state', state.shape)
         #print('GRU: unrolling finished')
@@ -139,9 +138,12 @@ class MetaGRUCell(RNNCell):
         #print('MGRU forward_single: data', tf.shape(data))
         data_and_state = tf.concat([data, prev_state], axis=-1)
         #print('MGRU forward_single: data and state metadense input', tf.shape(data_and_state))
+        #print('MGRU forward_single: feature metadense input', tf.shape(feature))
         z = tf.math.sigmoid(self.dense_z(feature, data_and_state))
         r = tf.math.sigmoid(self.dense_r(feature, data_and_state))
-
+        #print('z shape', tf.shape(z))
+        #print('r shape', tf.shape(r))
+        #print('tanh shape', tf.shape(self.dense_h2h(feature, r * prev_state)))
         state = z * prev_state + (1 - z) * tf.tanh(self.dense_i2h(feature, data) + self.dense_h2h(feature, r * prev_state))
 
         return state, [state]

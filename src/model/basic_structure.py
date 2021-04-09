@@ -1,4 +1,5 @@
 import tensorflow as tf
+from helper.metric import tf_batchdot
 
 class MLP(tf.keras.Sequential):
 # Multilayer perceptron.
@@ -63,4 +64,5 @@ class MetaDense(tf.keras.layers.Layer):
         #print('metadense weight', tf.shape(weight))
         #print('metadense data', tf.shape(data))
         bias = tf.reshape(self.b_mlp(feature), shape=(-1, 1, 1)) # [n, 1, 1]
+        #print('metadense return', tf.shape(tf_batchdot(data, weight) + bias))
         return tf.matmul(data, weight) + bias

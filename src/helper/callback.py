@@ -72,7 +72,7 @@ class Logger:
 
 			self.cnt = 0
 			self.best = len(self.eval) - 1
-			self.net.save_weights('%s-%04d.params' % (self.name, self.eval[self.best]['epoch']))
+			self.net.save_weights('%s-%04d.ckpt' % (self.name, self.eval[self.best]['epoch']))
 			print('save model to %s-%04d.params' % (self.name, self.eval[self.best]['epoch']))
 
 		self.dump()

@@ -20,6 +20,26 @@ def get_soc_feature(dataset):
 	evangel = utils.state_white_evang_pct()
 	evangel = (evangel - np.mean(evangel, axis=0)) / np.std(evangel, axis=0)
 
+	# get educational attainment percentages and calculate z-scores
+	edu = utils.state_education()
+	edu = (edu - np.mean(edu, axis=0)) / np.std(edu, axis=0)
+
+	# get prev election party percentages and calculate z-scores
+	prev = utils.state_prev_results()
+	prev = (prev - np.mean(prev, axis=0)) / np.std((prev), axis=0)
+
+	# get state median ages and calculate z-scores
+	age = utils.state_median_age()
+	age = (age - np.mean(age, axis=0)) / np.std((age), axis=0)
+
+	# get state median household incomes and calculate z-scores
+	income = utils.state_median_income()
+	income = (income - np.mean(income, axis=0)) / np.std((income), axis=0)
+
+	# get state race distributions and calculate z-scores
+	race = utils.state_races()
+	race = (race - np.mean(race, axis=0)) / np.std((race), axis=0)
+
 	# get correlation matrix
 	corr, e_bi = utils.correlation_matrix(n_neighbors)
 
@@ -42,22 +62,45 @@ def get_soc_feature(dataset):
 	# merge features (pop size, urban density, evangelical pct, correlation values of n nearest states)
 	features = []
 	for i in range(n):
-		f = np.concatenate([urb[i], evangel[i], corr[e_bi[i], i]])
+		f = np.concatenate([urb[i], evangel[i], edu[i], prev[i], age[i], income[i], race[i], corr[e_bi[i],i]])
 		features.append(f)
 	features = np.stack(features)
 	return features, (corr, e_bi)
 
+def series_to_supervised(data, n_in=3, n_out=3, dropnan=True):
+    #n_vars = 1 if type(data) is list else data.shape[1]
+    df = pd.DataFrame(data)
+    cols = list()
+    # input sequence (t-n, ... t-1)
+    for i in range(n_in, 0, -1):
+        cols.append(df.shift(i))
+    # forecast sequence (t, t+1, ... t+n)
+    for i in range(0, n_out):
+        cols.append(df.shift(-i))
+    # put it all together
+    agg = pd.concat(cols, axis=1)
+    # drop rows with NaN values
+    if dropnan:
+        agg.dropna(inplace=True)
+    return agg.values
+
 def dataloader(dataset):
 	data = pd.read_csv(os.path.join(DATA_PATH, 'pollavg.csv'))
+	#data = data.drop(['DC'], axis=1)
 	# split df, one for each candidate
 	half_idx = int(len(data) /2)
 	b_data = data[:half_idx]
-	t_data = data[-half_idx:]
+	t_data = data[half_idx:]
+	#b_data = b_data.iloc[::-1] #earliest date first
+	#t_data = t_data.iloc[::-1]
 
-	n_timestamp = b_data.shape[0]
+	#b_data = b_data.dropna(thresh=43)
+	#t_data =t_data.dropna(thresh=43)
 
 	b_data = utils.fill_missing(b_data)
 	t_data = utils.fill_missing(t_data)
+
+	n_timestamp = b_data.shape[0]
 
 	num_train = int(n_timestamp * dataset['train_prop'])
 	num_eval = int(n_timestamp * dataset['eval_prop'])
@@ -65,10 +108,16 @@ def dataloader(dataset):
 
 	b_train = b_data[:num_train].copy()
 	t_train = t_data[:num_train].copy()
-	b_eval = b_data[num_train: num_train + num_eval].copy()
-	t_eval = t_data[num_train: num_train + num_eval].copy()
-	b_test = b_data[-num_test:].copy()
-	t_test = t_data[-num_test:].copy()
+	if num_eval != 0:
+		b_eval = b_data[num_train: num_train + num_eval].copy()
+		t_eval = t_data[num_train: num_train + num_eval].copy()
+		b_test = b_data[-num_test:].copy()
+		t_test = t_data[-num_test:].copy()
+	else:
+		b_eval = t_eval = None
+		b_test = b_data[num_train:].copy()
+		t_test = t_data[num_train:].copy()
+
 	return b_train, t_train, b_eval, t_eval, b_test, t_test
 
 def dataiter_all_sensors_seq2seq(b_df, t_df, scaler, setting, shuffle=True):
@@ -79,7 +128,7 @@ def dataiter_all_sensors_seq2seq(b_df, t_df, scaler, setting, shuffle=True):
 	#print('b_df_fill', b_df_fill)
 
 	b_df_fill, t_df_fill = scaler.transform(b_df, t_df)
-	#print('biden fill', b_df_fill)
+	print('biden fill', b_df_fill)
 	n_timestamp = b_df_fill.shape[0]
 
 	data_list = [np.expand_dims(b_df_fill.values, axis=-1)] # allows arrays to be stored in each df 'cell' (df expanded in last axis and wrapped in array type)
