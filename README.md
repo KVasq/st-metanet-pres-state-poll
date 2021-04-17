@@ -1,6 +1,6 @@
 # st-metanet-pres-state-poll
 
-Based off of [ST-MetaNet](https://github.com/panzheyi/ST-MetaNet), implementation recoded from MXnet to Tensorflow and with a new data pipeline, utilizing social rather than spatial embedding space. The technical report for this project can be found [here](https://drive.google.com/file/d/1nJe_7W566n8_2wB0_GSAt7_m83E3nBlQ/view?usp=sharing).
+Based off of [ST-MetaNet](https://github.com/panzheyi/ST-MetaNet), implementation recoded from MXnet to Tensorflow and with a new data pipeline, utilizing social rather than spatial embedding space. The technical report for this project can be found [here](https://drive.google.com/file/d/1nJe_7W566n8_2wB0_GSAt7_m83E3nBlQ/view?usp=sharing). the ```testing``` branch contains the most recent stable code and any verification of results should be done using ```testing```
 
 ### System 
 
