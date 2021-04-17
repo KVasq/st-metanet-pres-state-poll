@@ -31,5 +31,4 @@ In order to run the code follow the procedure:
 3. To train from scratch, delete the files in ```param/```, otherwise the code will train from the best recorded model parameters.
 
 
-## Code Documentation
 The primary components of the model are seperated into  ```cell.py```, ```seq2seq.py```, ```basic_structure.py```, which are the the RNN, Seq2Seq, and neural net/meta-net structures respectively.
